@@ -9,68 +9,112 @@ export type Route =
   | 'contact'
   | 'notfound';
 
-const pathToRoute = (path: string): Route => {
-  const clean = path.replace(/^#\/?/, '').replace(/^\/+/, '');
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const removeBasePath = (pathname: string): string => {
+  if (basePath && pathname.startsWith(basePath)) {
+    return pathname.slice(basePath.length);
+  }
+
+  return pathname;
+};
+
+const pathToRoute = (pathname: string): Route => {
+  const pathnameWithoutBase = removeBasePath(pathname);
+  const clean = pathnameWithoutBase
+    .replace(/^\/+|\/+$/g, '')
+    .toLowerCase();
+
   switch (clean) {
     case '':
     case 'home':
       return 'home';
+
     case 'menu':
     case 'regular-menu':
       return 'menu';
+
     case 'specials':
     case 'weekly-specials':
       return 'specials';
+
     case 'catering':
       return 'catering';
+
     case 'location':
     case 'hours-location':
       return 'location';
+
     case 'contact':
       return 'contact';
+
     default:
-      return clean === '' ? 'home' : 'notfound';
+      return 'notfound';
   }
 };
 
 export const routeToPath = (route: Route): string => {
-  switch (route) {
-    case 'home':
-      return '#/';
-    case 'menu':
-      return '#/menu';
-    case 'specials':
-      return '#/specials';
-    case 'catering':
-      return '#/catering';
-    case 'location':
-      return '#/location';
-    case 'contact':
-      return '#/contact';
-    default:
-      return '#/404';
-  }
+  const routePath = (() => {
+    switch (route) {
+      case 'home':
+        return '/';
+
+      case 'menu':
+        return '/menu';
+
+      case 'specials':
+        return '/specials';
+
+      case 'catering':
+        return '/catering';
+
+      case 'location':
+        return '/location';
+
+      case 'contact':
+        return '/contact';
+
+      default:
+        return '/404';
+    }
+  })();
+
+  return `${basePath}${routePath}`;
 };
 
 export function useRouter() {
   const [route, setRoute] = useState<Route>(() =>
-    pathToRoute(window.location.hash)
+    pathToRoute(window.location.pathname)
   );
 
   useEffect(() => {
-    const onHashChange = () => {
-      setRoute(pathToRoute(window.location.hash));
-      window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    const onPopState = () => {
+      setRoute(pathToRoute(window.location.pathname));
+      window.scrollTo({ top: 0, behavior: 'auto' });
     };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
+
+    window.addEventListener('popstate', onPopState);
+
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+    };
   }, []);
 
-  const navigate = useCallback((r: Route) => {
-    window.location.hash = routeToPath(r).slice(1);
+  const navigate = useCallback((nextRoute: Route) => {
+    const path = routeToPath(nextRoute);
+
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path);
+    }
+
+    setRoute(nextRoute);
+    window.scrollTo({ top: 0, behavior: 'auto' });
   }, []);
 
-  return { route, navigate };
+  return {
+    route,
+    navigate,
+  };
 }
 
 export const navItems: { label: string; route: Route }[] = [
